@@ -1,6 +1,7 @@
-# svn $Id$
+# git $Id$
+# svn $Id: Linux-ifort.mk 1099 2022-01-06 21:01:01Z arango $
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-# Copyright (c) 2002-2020 The ROMS/TOMS Group                           :::
+# Copyright (c) 2002-2022 The ROMS/TOMS Group                           :::
 #   Licensed under a MIT/X style license                                :::
 #   See License_ROMS.txt                                                :::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -13,10 +14,6 @@
 # FFLAGS         Flags to the fortran compiler
 # CPP            Name of the C-preprocessor
 # CPPFLAGS       Flags to the C-preprocessor
-# CC             Name of the C compiler
-# CFLAGS         Flags to the C compiler
-# CXX            Name of the C++ compiler
-# CXXFLAGS       Flags to the C++ compiler
 # HDF5_INCDIR    HDF5 include directory
 # HDF5_LIBDIR    HDF5 library directory
 # HDF5_LIBS      HDF5 library switches
@@ -39,10 +36,6 @@
         FREEFLAGS := -free
               CPP := /usr/bin/cpp
          CPPFLAGS := -P -traditional-cpp -w          # -w turns of warnings
-               CC := gcc
-              CXX := g++
-           CFLAGS :=
-         CXXFLAGS :=
            INCDIR := /usr/include /usr/local/bin
             SLIBS := -L/usr/local/lib -L/usr/lib
             ULIBS :=
@@ -136,7 +129,7 @@ ifdef USE_WRF
              LIBS += $(WRF_LIB_DIR)/external/io_grib1/libio_grib1.a
              LIBS += $(WRF_LIB_DIR)/external/io_grib_share/libio_grib_share.a
              LIBS += $(WRF_LIB_DIR)/external/io_int/libwrfio_int.a
-             LIBS += $(WRF_LIB_DIR)/external/esmf_time_f90/libmyesmf_time.a
+             LIBS += $(WRF_LIB_DIR)/external/esmf_time_f90/libesmf_time.a
              LIBS += $(WRF_LIB_DIR)/external/RSL_LITE/librsl_lite.a
              LIBS += $(WRF_LIB_DIR)/frame/module_internal_header_util.o
              LIBS += $(WRF_LIB_DIR)/frame/pack_utils.o
@@ -149,7 +142,7 @@ ifdef USE_WRF
              LIBS += $(WRF_LIB_DIR)/libio_grib1.a
              LIBS += $(WRF_LIB_DIR)/libio_grib_share.a
              LIBS += $(WRF_LIB_DIR)/libwrfio_int.a
-             LIBS += $(WRF_LIB_DIR)/libmyesmf_time.a
+             LIBS += $(WRF_LIB_DIR)/libesmf_time.a
              LIBS += $(WRF_LIB_DIR)/librsl_lite.a
              LIBS += $(WRF_LIB_DIR)/module_internal_header_util.o
              LIBS += $(WRF_LIB_DIR)/pack_utils.o
@@ -162,6 +155,30 @@ endif
 #--------------------------------------------------------------------------
 
           LDFLAGS := $(FFLAGS)
+
+ifdef USE_PIO
+       PIO_INCDIR ?= /opt/intelsoft/openmpi/pio/include
+       PIO_LIBDIR ?= /opt/intelsoft/openmpi/pio/lib
+           FFLAGS += -I$(PIO_INCDIR)
+             LIBS += -L$(PIO_LIBDIR) -lpiof -lpioc
+
+   PNETCDF_INCDIR ?= /opt/intelsoft/openmpi/pnetcdf/include
+   PNETCDF_LIBDIR ?= /opt/intelsoft/openmpi/pnetcdf/lib
+           FFLAGS += -I$(PNETCDF_INCDIR)
+             LIBS += -L$(PNETCDF_LIBDIR) -lpnetcdf
+endif
+
+ifdef USE_SCORPIO
+       PIO_INCDIR ?= /opt/intelsoft/openmpi/scorpio/include
+       PIO_LIBDIR ?= /opt/intelsoft/openmpi/scorpio/lib
+           FFLAGS += -I$(PIO_INCDIR)
+             LIBS += -L$(PIO_LIBDIR) -lpiof -lpioc
+
+   PNETCDF_INCDIR ?= /opt/intelsoft/openmpi/pnetcdf/include
+   PNETCDF_LIBDIR ?= /opt/intelsoft/openmpi/pnetcdf/lib
+           FFLAGS += -I$(PNETCDF_INCDIR)
+             LIBS += -L$(PNETCDF_LIBDIR) -lpnetcdf
+endif
 
 ifdef USE_NETCDF4
         NF_CONFIG ?= nf-config
@@ -196,36 +213,19 @@ endif
 ifdef USE_MPI
          CPPFLAGS += -DMPI
  ifdef USE_MPIF90
+  ifeq ($(which_MPI), intel)
+               FC := mpiifort
+  else
                FC := mpif90
+  endif
  else
-             LIBS += -lfmpi-pgi -lmpi-pgi
+             LIBS += -lfmpi -lmpi
  endif
 endif
 
 ifdef USE_OpenMP
          CPPFLAGS += -D_OPENMP
            FFLAGS += -qopenmp -fpp
-endif
-
-ifdef USE_DEBUG
-         CPPFLAGS += -DUSE_DEBUG
-           FFLAGS += -g
-#          FFLAGS += -check all
-           FFLAGS += -check bounds
-           FFLAGS += -check uninit
-##         FFLAGS += -fp-stack-check
-           FFLAGS += -traceback
-           FFLAGS += -warn interfaces,nouncalled -gen-interfaces
-#          FFLAGS += -Wl,-no_compact_unwind
-#          FFLAGS += -Wl,-stack_size,0x64000000
-           FFLAGS += -ftrapuv -fpe0
-           CFLAGS += -g
-         CXXFLAGS += -g
-else
-           FFLAGS += -ip -O3
-#          FFLAGS += -Wl,-stack_size,0x64000000
-           CFLAGS += -O3
-         CXXFLAGS += -O3
 endif
 
 ifdef USE_MCT
@@ -243,10 +243,6 @@ ifdef USE_ESMF
                      include $(ESMF_MK_DIR)/esmf.mk
            FFLAGS += $(ESMF_F90COMPILEPATHS)
              LIBS += $(ESMF_F90LINKPATHS) $(ESMF_F90ESMFLINKLIBS)
-endif
-
-ifdef USE_CXX
-             LIBS += -lstdc++
 endif
 
 # Use full path of compiler.

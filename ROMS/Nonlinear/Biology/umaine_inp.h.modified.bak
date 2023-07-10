@@ -27,13 +27,13 @@
       integer :: i, ifield, is, itracer, itrc, ng, nline, status
 
       integer :: igrid
-
+ 
       logical, dimension(NBT*Ngrids) :: Ltrc
 # if defined DIAGNOSTICS_BIO
       logical, dimension(NDbio2d,Ngrids) :: Lbio2d
       logical, dimension(NDbio3d,Ngrids) :: Lbio3d
 # endif
-
+ 
       real(r8), dimension(NBT*Ngrids) :: Rbio
 
       real(r8), dimension(nRval) :: Rval
@@ -277,7 +277,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  nl_tnu2(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  nl_tnu2(i,ng)=Rbio(itrc,ng)
+                  nl_tnu2(i,ng)=Rbio(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('TNU4')
@@ -285,7 +286,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  nl_tnu4(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  nl_tnu4(i,ng)=Rbio(itrc,ng)
+                  nl_tnu4(i,ng)=Rbio(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('ad_TNU2')
@@ -293,8 +295,10 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  ad_tnu2(i,ng)=Rbio(itrc+(ng-1)*NBT)
-                  tl_tnu2(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  ad_tnu2(i,ng)=Rbio(itrc,ng)
+                  ad_tnu2(i,ng)=Rbio(itrc*Ngrids+ng)
+!                  tl_tnu2(i,ng)=Rbio(itrc,ng)
+                  tl_tnu2(i,ng)=Rbio(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('ad_TNU4')
@@ -302,8 +306,10 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  ad_tnu4(i,ng)=Rbio(itrc+(ng-1)*NBT)
-                  tl_tnu4(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  ad_tnu4(i,ng)=Rbio(itrc,ng)
+                  ad_tnu4(i,ng)=Rbio(itrc*Ngrids+ng)
+!                  ad_tnu4(i,ng)=Rbio(itrc,ng)
+                  ad_tnu4(i,ng)=Rbio(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('LtracerSponge')
@@ -311,7 +317,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  LtracerSponge(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  LtracerSponge(i,ng)=Ltrc(itrc,ng)
+                  LtracerSponge(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('AKT_BAK')
@@ -319,7 +326,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  Akt_bak(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  Akt_bak(i,ng)=Rbio(itrc,ng)
+                  Akt_bak(i,ng)=Rbio(itrc*Ngrids+ng) 
                 END DO
               END DO
             CASE ('TNUDG')
@@ -327,7 +335,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  Tnudg(i,ng)=Rbio(itrc+(ng-1)*NBT)
+!                  Tnudg(i,ng)=Rbio(itrc,ng)
+                  Tnudg(i,ng)=Rbio(itrc*Ngrids+ng) 
                 END DO
               END DO
             CASE ('Hadvection')
@@ -347,6 +356,8 @@
               ELSE
                 itracer=1                      ! next nested grid
               END IF
+!              Cval(1)='M'
+!              Cval(2)='P'
               itrc=idbio(itracer)
               Npts=load_tadv(Nval, Cval, line, nline, itrc, igrid,      &
      &                       itracer, idbio(iTrcStr), idbio(iTrcEnd),   &
@@ -368,16 +379,19 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  LtracerSrc(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  LtracerSrc(i,ng)=Ltrc(itrc,ng)
+!                  LtracerSrc(i,ng)=Ltrc(itrc*Ngrids+ng)
+                  LtracerSrc(i,ng)=.true.
                 END DO
               END DO
-              
             CASE ('LtracerCLM')
               Npts=load_l(Nval, Cval, NBT*Ngrids, Ltrc)
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  LtracerCLM(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  LtracerCLM(i,ng)=Ltrc(itrc,ng)
+                  LtracerCLM(i,ng)=.false.
+!                  LtracerCLM(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('LnudgeTCLM')
@@ -385,7 +399,9 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idbio(itrc)
-                  LnudgeTCLM(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  LnudgeTCLM(i,ng)=Ltrc(itrc,ng)
+                  LnudgeTCLM(i,ng)=.false.
+!                  LnudgeTCLM(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('Hout(idTvar)')
@@ -399,7 +415,8 @@
                     exit_flag=5
                     RETURN
                   END IF
-                  Hout(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  Hout(i,ng)=Ltrc(itrc,ng)
+                  Hout(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
             CASE ('Hout(idTsur)')
@@ -413,7 +430,8 @@
                     exit_flag=5
                     RETURN
                   END IF
-                  Hout(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  Hout(i,ng)=Ltrc(itrc,ng)
+                  Hout(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
 #ifdef PRIMARY_PROD
@@ -431,7 +449,8 @@
               DO ng=1,Ngrids
                 DO itrc=1,NBT
                   i=idTvar(idbio(itrc))
-                  Aout(i,ng)=Ltrc(itrc+(ng-1)*NBT)
+!                  Aout(i,ng)=Ltrc(itrc,ng)
+                 Aout(i,ng)=Ltrc(itrc*Ngrids+ng)
                 END DO
               END DO
 #endif
@@ -451,7 +470,7 @@
                     exit_flag=5
                     RETURN
                   END IF
-                  Dout(i,ng)=Lbio2d(itrc+(ng-1)*NBT)
+                  Dout(i,ng)=Lbio2d(itrc,ng)
                 END DO
               END DO
             CASE ('Dout(iDbio3)')
@@ -465,7 +484,7 @@
                     exit_flag=5
                     RETURN
                   END IF
-                  Dout(i,ng)=Lbio3d(itrc+(ng-1)*NBT)
+                  Dout(i,ng)=Lbio3d(itrc,ng)
                 END DO
               END DO
 # endif

@@ -50,7 +50,7 @@
 **         npzd_iron.in                                               **
 **         npzd_Powell.in                                             **
 **         red_tide.in                                                **
-**                                                                    **
+**         bioUMaine.in                                               **
 **   (4) Code to read input model parameters:                         **
 **                                                                    **
 **         ecosim_inp.h                                               **

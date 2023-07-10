@@ -78,7 +78,8 @@ ifdef USE_ROMS
            FFLAGS += -Mchkstk -Mchkfpstk
  else
 #          FFLAGS += -Bstatic
-           FFLAGS += -fastsse -Mipa=fast
+#          FFLAGS += -fastsse -Mipa=fast
+           FFLAGS += -O3
  endif
            FFLAGS += -Kieee
         MDEPFLAGS := --cpp --fext=f90 --file=- --objdir=$(SCRATCH_DIR)

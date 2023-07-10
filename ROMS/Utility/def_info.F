@@ -1133,9 +1133,10 @@
 !  Biology model header file used.
 !
         IF (exit_flag.eq.NoError) THEN
-          DO i=1,512
-            bio_file(i:i)='-'
-          END DO
+!          DO i=1,512
+!            bio_file(i:i)='-'
+!          END DO
+             bio_file='ROMS/Nonlinear/Biology/umaine.h'
           status=nf90_put_att(ncid, nf90_global, 'bio_file',            &
      &                        bio_file)
           IF (FoundError(status, nf90_noerr, __LINE__,                  &

@@ -2,9 +2,10 @@
       MODULE step3d_t_mod
 #if !defined TS_FIXED && (defined NONLINEAR && defined SOLVE3D)
 !
-!svn $Id$
+!git $Id$
+!svn $Id: step3d_t.F 1103 2022-01-13 03:38:35Z arango $
 !=======================================================================
-!  Copyright (c) 2002-2020 The ROMS/TOMS Group                         !
+!  Copyright (c) 2002-2022 The ROMS/TOMS Group                         !
 !    Licensed under a MIT/X style license                              !
 !    See License_ROMS.txt                           Hernan G. Arango   !
 !========================================== Alexander F. Shchepetkin ===
@@ -47,9 +48,6 @@
       USE mod_grid
       USE mod_mixing
       USE mod_ocean
-# if defined TRC_PSOURCE
-      USE mod_trc_sources
-# endif
       USE mod_stepping
 !
 !  Imported variable declarations.
@@ -58,22 +56,18 @@
 !
 !  Local variable declarations.
 !
+      character (len=*), parameter :: MyFile =                          &
+     &  __FILE__
+!
 # include "tile.h"
 !
 # ifdef PROFILE
-      CALL wclock_on (ng, iNLM, 35, __LINE__, __FILE__)
+      CALL wclock_on (ng, iNLM, 35, __LINE__, MyFile)
 # endif
       CALL step3d_t_tile (ng, tile,                                     &
      &                    LBi, UBi, LBj, UBj,                           &
      &                    IminS, ImaxS, JminS, JmaxS,                   &
      &                    nrhs(ng), nstp(ng), nnew(ng),                 &
-# if defined TRC_PSOURCE
-     &                    Msrcpt(ng), Nsrcpt(ng),                       &
-     &                    TRC_SOURCES(ng) % Isrcpt,                     &
-     &                    TRC_SOURCES(ng) % Jsrcpt,                     &
-     &                    TRC_SOURCES(ng) % Tsrcpt,                     &
-     &                    TRC_SOURCES(ng) % Lsrcpt,                     &
-# endif
 # ifdef MASKING
      &                    GRID(ng) % rmask,                             &
      &                    GRID(ng) % umask,                             &
@@ -103,10 +97,11 @@
 # ifdef DIAGNOSTICS_TS
      &                    DIAGS(ng) % DiaTwrk,                          &
 # endif
-     &                    OCEAN(ng) % t)
+     &                    OCEAN(ng) % t, OCEAN(ng) % u, OCEAN(ng) % v)
 # ifdef PROFILE
-      CALL wclock_off (ng, iNLM, 35, __LINE__, __FILE__)
+      CALL wclock_off (ng, iNLM, 35, __LINE__, MyFile)
 # endif
+!
       RETURN
       END SUBROUTINE step3d_t
 !
@@ -115,10 +110,6 @@
      &                          LBi, UBi, LBj, UBj,                     &
      &                          IminS, ImaxS, JminS, JmaxS,             &
      &                          nrhs, nstp, nnew,                       &
-# if defined TRC_PSOURCE
-     &                          Msrcpt, Nsrcpt,                         &
-     &                          Isrcpt, Jsrcpt, Tsrcpt, Lsrcpt,         &
-# endif
 # ifdef MASKING
      &                          rmask, umask, vmask,                    &
 # endif
@@ -137,7 +128,7 @@
 # ifdef DIAGNOSTICS_TS
      &                          DiaTwrk,                                &
 # endif
-     &                          t)
+     &                          t, u, v)
 !***********************************************************************
 !
       USE mod_param
@@ -147,9 +138,6 @@
       USE mod_nesting
 # endif
       USE mod_scalars
-#  if (defined ICE_MODEL && defined ICE_THERMO) || defined CICE_MODEL
-      USE ice_frazil_mod, ONLY : ice_frazil
-# endif
       USE mod_sources
 !
       USE exchange_3d_mod, ONLY : exchange_r3d_tile
@@ -162,9 +150,6 @@
       USE nesting_mod, ONLY : bry_fluxes
 # endif
       USE t3dbc_mod, ONLY : t3dbc_tile
-# ifdef T_PASSIVE
-      USE pt3dbc_mod, ONLY : pt3dbc_tile
-# endif
 !
 !  Imported variable declarations.
 !
@@ -172,17 +157,8 @@
       integer, intent(in) :: LBi, UBi, LBj, UBj
       integer, intent(in) :: IminS, ImaxS, JminS, JmaxS
       integer, intent(in) :: nrhs, nstp, nnew
-# if defined TRC_PSOURCE
-      integer, intent(in) :: Msrcpt, Nsrcpt
-# endif
-
+!
 # ifdef ASSUMED_SHAPE
-#  if defined TRC_PSOURCE
-      logical, intent(in)  :: Lsrcpt(:,:)
-      integer, intent(in)  :: Isrcpt(:)
-      integer, intent(in)  :: Jsrcpt(:)
-      real(r8), intent(in) :: Tsrcpt(:,:,:)
-#  endif
 #  ifdef MASKING
       real(r8), intent(in) :: rmask(LBi:,LBj:)
       real(r8), intent(in) :: umask(LBi:,LBj:)
@@ -215,8 +191,12 @@
 #  endif
 #  ifdef SUN
       real(r8), intent(inout) :: t(LBi:UBi,LBj:UBj,N(ng),3,NT(ng))
+      real(r8), intent(inout) :: u(LBi:UBi,LBj:UBj,N(ng),2)
+      real(r8), intent(inout) :: v(LBi:UBi,LBj:UBj,N(ng),2)
 #  else
       real(r8), intent(inout) :: t(LBi:,LBj:,:,:,:)
+      real(r8), intent(inout) :: u(LBi:,LBj:,:,:)
+      real(r8), intent(inout) :: v(LBi:,LBj:,:,:)
 #  endif
 #  if defined FLOATS && defined FLOAT_VWALK
       real(r8), intent(out) :: dAktdz(LBi:,LBj:,:)
@@ -224,12 +204,6 @@
 
 # else
 
-#  if defined TRC_PSOURCE
-      logical, intent(in) :: Lsrcpt(Msrcpt,NT(ng))
-      integer, intent(in) :: Isrcpt(Msrcpt)
-      integer, intent(in) :: Jsrcpt(Msrcpt)
-      real(r8), intent(in) :: Tsrcpt(Msrcpt,N(ng),NT(ng))
-#  endif
 #  ifdef MASKING
       real(r8), intent(in) :: rmask(LBi:UBi,LBj:UBj)
       real(r8), intent(in) :: umask(LBi:UBi,LBj:UBj)
@@ -260,7 +234,7 @@
 #  endif
       real(r8), intent(inout) :: t(LBi:UBi,LBj:UBj,N(ng),3,NT(ng))
 
-#  if defined FLOATS && defined FLOAT_VWALK
+#  if q/speeefined FLOATS && defined FLOAT_VWALK
       real(r8), intent(out) :: dAktdz(LBi:UBi,LBj:UBj,N(ng))
 #  endif
 # endif
@@ -275,7 +249,6 @@
 # endif
       integer :: IminT, ImaxT, JminT, JmaxT
       integer :: Isrc, Jsrc
-      integer :: ibt, itp
       integer :: i, ic, ii, is, itrc, j, jj, k, ltrc
 # if defined AGE_MEAN && defined T_PASSIVE
       integer :: iage
@@ -285,11 +258,12 @@
 # endif
       real(r8) :: eps = 1.0E-16_r8
       real(r8) :: eps1 = 1.0E-12_r8
-
+      real(r8) :: k0,kk, kage,kuv,kt, temp,maxk,mink,kcount,ka,kagea,kuva,kta,pcount
       real(r8) :: cff, cff1, cff2, cff3
       real(r8) :: betaL, betaR, betaD, betaU
       real(r8) :: rL, rR, rD, rU, rkaL, rkaR, rkaD, rkaU
       real(r8) :: a1, b1, sw, sw_eta, sw_xi
+
 
       real(r8), dimension(IminS:ImaxS) :: gradX, KaX, oKaX
       real(r8), dimension(JminS:JmaxS) :: gradE, KaE, oKaE
@@ -316,12 +290,7 @@
       real(r8), allocatable :: Va(:,:,:)
       real(r8), allocatable :: Wa(:,:,:)
 
-# ifdef AGE_DISTRIBUTION
-      real(r8) :: fac
-# endif
-!
 # include "set_bounds.h"
-
 # ifdef NESTING
 !
 !  Notice that the trace flux boundary arrays are dimensioned with the
@@ -396,12 +365,7 @@
 !  Horizontal tracer advection.  It is possible to have a different
 !  advection schme for each tracer.
 !
-#ifdef OFFLINE_BIOLOGY
-      T_LOOP1 : DO ibt=1,NBT
-        itrc=idbio(ibt)
-#else
       T_LOOP1 : DO itrc=1,NT(ng)
-#endif
 !
 !  The MPDATA and HSIMT algorithms requires a three-point footprint, so
 !  exchange boundary data on t(:,:,:,nnew,:) so other processes computed
@@ -769,6 +733,9 @@
 !  Apply tracers point sources to the horizontal advection terms,
 !  if any.
 !
+!    Dsrc(is) = 0,  flow across grid cell u-face (positive or negative)
+!    Dsrc(is) = 1,  flow across grid cell v-face (positive or negative)
+!
           IF (LuvSrc(ng)) THEN
             DO is=1,Nsrc(ng)
               Isrc=SOURCES(ng)%Isrc(is)
@@ -789,13 +756,7 @@
                 IF (LapplySrc) THEN
                   IF (LtracerSrc(itrc,ng)) THEN
                     FX(Isrc,Jsrc)=Huon(Isrc,Jsrc,k)*                    &
-# ifdef ONE_TRACER_SOURCE
-     &                            SOURCES(ng)%Tsrc(itrc)
-# elif defined TWO_D_TRACER_SOURCE
-     &                            SOURCES(ng)%Tsrc(is,itrc)
-# else
      &                            SOURCES(ng)%Tsrc(is,k,itrc)
-# endif
 # ifdef MASKING
                   ELSE
                     IF ((rmask(Isrc  ,Jsrc).eq.0.0_r8).and.             &
@@ -826,13 +787,7 @@
                 IF (LapplySrc) THEN
                   IF (LtracerSrc(itrc,ng)) THEN
                     FE(Isrc,Jsrc)=Hvom(Isrc,Jsrc,k)*                    &
-# ifdef ONE_TRACER_SOURCE
-     &                            SOURCES(ng)%Tsrc(itrc)
-# elif defined TWO_D_TRACER_SOURCE
-     &                            SOURCES(ng)%Tsrc(is,itrc)
-# else
      &                            SOURCES(ng)%Tsrc(is,k,itrc)
-# endif
 # ifdef MASKING
                   ELSE
                     IF ((rmask(Isrc,Jsrc  ).eq.0.0_r8).and.             &
@@ -876,11 +831,9 @@
 # endif
 !
 !  If MPDATA, time-step horizontal advection for intermediate diffusive
-!  tracer, Ta. Otherwise, time-step horizontal advection term.
-!  Advective fluxes have units of Tunits m3/s.  The new tracer has
-!  units of m Tunits.
+!  tracer, Ta (m Tunits).
 !
-          IF (Hadvection(itrc,ng)%MPDATA) THEN
+          HADV_STEPPING : IF (Hadvection(itrc,ng)%MPDATA) THEN
             DO j=JstrVm2,Jendp2i
               DO i=IstrUm2,Iendp2i
                 cff=dt(ng)*pm(i,j)*pn(i,j)
@@ -905,7 +858,11 @@
               END DO
             END DO
 # endif
-          ELSE                                               ! otherwise
+!
+!  OTHERWISE, time-step horizontal advection term.  Advective fluxes
+!  have units of Tunits m3/s.  The new tracer has units of m Tunits.
+!
+          ELSE
             DO j=Jstr,Jend
               DO i=Istr,Iend
                 cff=dt(ng)*pm(i,j)*pn(i,j)
@@ -920,7 +877,7 @@
 # endif
               END DO
             END DO
-          END IF
+          END IF HADV_STEPPING
         END DO K_LOOP
       END DO T_LOOP1
 !
@@ -928,12 +885,7 @@
 !  Time-step vertical advection term.
 !-----------------------------------------------------------------------
 !
-#ifdef OFFLINE_BIOLOGY
-      T_LOOP2 : DO ibt=1,NBT
-        itrc=idbio(ibt)
-#else
       T_LOOP2 : DO itrc=1,NT(ng)
-#endif
         IF (Vadvection(itrc,ng)%MPDATA) THEN
           JminT=JstrVm2
           JmaxT=Jendp2i
@@ -948,7 +900,7 @@
 !
 !  Build conservative parabolic splines for the vertical derivatives
 !  "FC" of the tracer.  Then, the interfacial "FC" values are
-!  converted to vertical advective flux.
+!  converted to vertical advective flux (Tunits m3/s).
 !
             DO i=Istr,Iend
 # ifdef NEUMANN
@@ -991,7 +943,7 @@
 !
           ELSE IF (Vadvection(itrc,ng)%AKIMA4) THEN
 !
-!  Fourth-order, Akima vertical advective flux.
+!  Fourth-order, Akima vertical advective flux (Tunits m3/s).
 !
             DO k=1,N(ng)-1
               DO i=Istr,Iend
@@ -1033,7 +985,8 @@
 !
           ELSE IF (Vadvection(itrc,ng)%CENTERED2) THEN
 !
-!  Second-order, central differences vertical advective flux.
+!  Second-order, central differences vertical advective flux
+!  (Tunits m3/s).
 !
             DO k=1,N(ng)-1
               DO i=Istr,Iend
@@ -1053,7 +1006,8 @@
 !
           ELSE IF (Vadvection(itrc,ng)%MPDATA) THEN
 !
-!  First_order, upstream differences vertical advective flux.
+!  First_order, upstream differences vertical advective flux
+!  (Tunits m3/s).
 !
             DO i=IstrUm2,Iendp2i
               DO k=1,N(ng)-1
@@ -1074,7 +1028,7 @@
 !
 !  Third High-order Spatial Interpolation at the Middle Temporal level
 !  (HSIMT; Wu and Zhu, 2010) with a Total Variation Diminishing (TVD)
-!  limiter vertical advection flux.
+!  limiter vertical advection flux (Tunits m3/s).
 !
             DO i=Istr,Iend
               KaZ(0)=0.0_r8
@@ -1142,7 +1096,8 @@
           ELSE IF ((Vadvection(itrc,ng)%CENTERED4).or.                  &
      &             (Vadvection(itrc,ng)%SPLIT_U3)) THEN
 !
-!  Fourth-order, central differences vertical advective flux.
+!  Fourth-order, central differences vertical advective flux
+!  (Tunits m3/s).
 !
             cff1=0.5_r8
             cff2=7.0_r8/12.0_r8
@@ -1176,56 +1131,46 @@
             END DO
           END IF VADV_FLUX
 !
-!  Apply mass point sources (volume vertical influx), if any.
+!  If MPDATA and cell-centered point source (LwSrc), augment the
+!  intermediate tracer, Ta, with the tracer divergence. For other
+!  advection schemes LwSrc is applied after the vertical advection
+!  is completed (J. Wilkin).
+!
+!    Dsrc(is) = 2,  flow across grid cell w-face (positive or negative)
 !
           IF (LwSrc(ng)) THEN
-            DO is=1,Nsrc(ng)
-              Isrc=SOURCES(ng)%Isrc(is)
-              Jsrc=SOURCES(ng)%Jsrc(is)
-              IF (LtracerSrc(itrc,ng)) THEN
-                IF ((Vadvection(itrc,ng)%MPDATA).or.                    &
-     &              (Vadvection(itrc,ng)%HSIMT)) THEN
-                  LapplySrc=(IstrUm2.le.Isrc).and.                      &
-     &                      (Isrc.le.Iendp2i).and.(j.eq.Jsrc)
-                ELSE
-                  LapplySrc=(IstrR.le.Isrc).and.                        &
-     &                      (Isrc.le.IendR).and.(j.eq.Jsrc)
+            IF (Hadvection(itrc,ng)%MPDATA) THEN
+              DO is=1,Nsrc(ng)
+                IF (INT(SOURCES(ng)%Dsrc(is)).eq.2) THEN
+                  Isrc=SOURCES(ng)%Isrc(is)
+                  Jsrc=SOURCES(ng)%Jsrc(is)
+                  IF (((Istr.le.Isrc).and.(Isrc.le.Iend+1)).and.        &
+     &                 ((Jstr.le.Jsrc).and.(Jsrc.le.Jend+1)).and.       &
+     &                 (j.eq.Jsrc)) THEN
+                    DO k=1,N(ng)
+                      cff=dt(ng)*pm(i,j)*pn(i,j)
+                      IF (LtracerSrc(itrc,ng)) THEN
+                        cff3=SOURCES(ng)%Tsrc(is,k,itrc)
+                      ELSE
+                        cff3=t(Isrc,Jsrc,k,3,itrc)
+                      END IF
+                      Ta(Isrc,Jsrc,k,itrc)=Ta(Isrc,Jsrc,k,itrc)+        &
+     &                                     cff*SOURCES(ng)%Qsrc(is,k)*  &
+     &                                     cff3
+                    END DO
+                  END IF
                 END IF
-                IF (LapplySrc) THEN
-                  DO k=1,N(ng)-1
-#  ifdef ONE_TRACER_SOURCE
-                    FC(Isrc,k)=FC(Isrc,k)+0.5_r8*                       &
-     &                         (SOURCES(ng)%Qsrc(is,k  )*               &
-     &                          SOURCES(ng)%Tsrc(itrc)+                 &
-     &                          SOURCES(ng)%Qsrc(is,k+1)*               &
-     &                          SOURCES(ng)%Tsrc(itrc) )
-#  elif defined TWO_D_TRACER_SOURCE
-                    FC(Isrc,k)=FC(Isrc,k)+0.5_r8*                       &
-     &                         (SOURCES(ng)%Qsrc(is,k  )*               &
-     &                          SOURCES(ng)%Tsrc(is,itrc)+              &
-     &                          SOURCES(ng)%Qsrc(is,k+1)*               &
-     &                          SOURCES(ng)%Tsrc(is,itrc) )
-#  else
-                    FC(Isrc,k)=FC(Isrc,k)+0.5_r8*                       &
-     &                         (SOURCES(ng)%Qsrc(is,k  )*               &
-     &                          SOURCES(ng)%Tsrc(is,k  ,itrc)+          &
-     &                          SOURCES(ng)%Qsrc(is,k+1)*               &
-     &                          SOURCES(ng)%Tsrc(is,k+1,itrc))
-#  endif
-                  END DO
-                END IF
-              END IF
-            END DO
+              END DO
+            END IF
           END IF
 !
 !  If MPDATA, time-step vertical advection for intermediate diffusive
-!  tracer, Ta (Tunits). Otherwise, time-step vertical advection term
-!  (m Tunits, except parabolic splines has Tunits).
+!  tracer, Ta (Tunits).
 # ifdef DIAGNOSTICS_TS
 !  Convert units of tracer diagnostic terms to Tunits.
 # endif
 !
-          IF (Vadvection(itrc,ng)%MPDATA) THEN
+          VADV_STEPPING : IF (Vadvection(itrc,ng)%MPDATA) THEN
             DO i=IstrUm2,Iendp2i
               CF(i,0)=dt(ng)*pm(i,j)*pn(i,j)
             END DO
@@ -1238,7 +1183,14 @@
 # endif
               END DO
             END DO
-          ELSE                                               ! otherwise
+!
+!  OTHERWISE, time-step vertical advection term (m Tunits, or Tunits if
+!  conservative, parabolic splines diffusion).
+# ifdef DIAGNOSTICS_TS
+!  Convert units of tracer diagnostic terms to Tunits.
+# endif
+!
+          ELSE
             DO i=Istr,Iend
               CF(i,0)=dt(ng)*pm(i,j)*pn(i,j)
             END DO
@@ -1258,7 +1210,7 @@
 # endif
               END DO
             END DO
-          END IF
+          END IF VADV_STEPPING
         END DO J_LOOP1
       END DO T_LOOP2
 !
@@ -1267,12 +1219,7 @@
 !  using MPDATA recursive method.  Notice that pipelined J-loop ended.
 !-----------------------------------------------------------------------
 !
-#ifdef OFFLINE_BIOLOGY
-      T_LOOP3 : DO ibt=1,NBT
-        itrc=idbio(ibt)
-#else
       T_LOOP3 : DO itrc=1,NT(ng)
-#endif
         MPDATA : IF ((Hadvection(itrc,ng)%MPDATA).and.                  &
      &               (Vadvection(itrc,ng)%MPDATA)) THEN
           CALL mpdata_adiff_tile (ng, tile,                             &
@@ -1321,14 +1268,14 @@
                 cff2=cff*(FE(i,j+1)-FE(i,j))
                 cff3=cff1+cff2
                 t(i,j,k,nnew,itrc)=Ta(i,j,k,itrc)*Hz(i,j,k)-cff3
-#  ifdef DIAGNOSTICS_TS
+# ifdef DIAGNOSTICS_TS
                 DiaTwrk(i,j,k,itrc,iTxadv)=DiaTwrk(i,j,k,itrc,iTxadv)-  &
      &                                     cff1
                 DiaTwrk(i,j,k,itrc,iTyadv)=DiaTwrk(i,j,k,itrc,iTyadv)-  &
      &                                     cff2
                 DiaTwrk(i,j,k,itrc,iThadv)=DiaTwrk(i,j,k,itrc,iThadv)-  &
      &                                     cff3
-#  endif
+# endif
               END DO
             END DO
           END DO
@@ -1350,9 +1297,9 @@
             END DO
 !
 !  Time-step corrected vertical advection (Tunits).
-#  ifdef DIAGNOSTICS_TS
+# ifdef DIAGNOSTICS_TS
 !  Convert units of tracer diagnostic terms to Tunits.
-#  endif
+# endif
 !
             DO i=Istr,Iend
               CF(i,0)=dt(ng)*pm(i,j)*pn(i,j)
@@ -1361,14 +1308,14 @@
               DO i=Istr,Iend
                 cff1=CF(i,0)*(FC(i,k)-FC(i,k-1))
                 t(i,j,k,nnew,itrc)=t(i,j,k,nnew,itrc)-cff1
-#  ifdef DIAGNOSTICS_TS
+# ifdef DIAGNOSTICS_TS
                 DiaTwrk(i,j,k,itrc,iTvadv)=Dvadv(i,j,k,itrc)-           &
      &                                     cff1
                 DO idiag=1,NDT
                   DiaTwrk(i,j,k,itrc,idiag)=DiaTwrk(i,j,k,itrc,idiag)*  &
      &                                      oHz(i,j,k)
                 END DO
-#  endif
+# endif
               END DO
             END DO
           END DO
@@ -1376,16 +1323,53 @@
       END DO T_LOOP3
 !
 !-----------------------------------------------------------------------
+!  Add tracer divergence due to cell-centered (LwSrc) point sources.
+!-----------------------------------------------------------------------
+!
+!  When LTracerSrc is .true. the inflowing concentration is Tsrc.
+!  When LtracerSrc is .false. we add tracer mass to compensate for the
+!  added volume to keep the receiving cell concentration unchanged.
+!  J. Levin (Jupiter Intelligence Inc.) and J. Wilkin
+!
+!    Dsrc(is) = 2,  flow across grid cell w-face (positive or negative)
+!
+      IF (LwSrc(ng)) THEN
+        DO itrc=1,NT(ng)
+          IF (.not.((Hadvection(itrc,ng)%MPDATA).and.                   &
+     &              (Vadvection(itrc,ng)%MPDATA))) THEN
+            DO is=1,Nsrc(ng)
+             IF (INT(SOURCES(ng)%Dsrc(is)).eq.2) THEN
+                Isrc=SOURCES(ng)%Isrc(is)
+                Jsrc=SOURCES(ng)%Jsrc(is)
+                IF (((Istr.le.Isrc).and.(Isrc.le.Iend+1)).and.          &
+     &              ((Jstr.le.Jsrc).and.(Jsrc.le.Jend+1))) THEN
+                  DO k=1,N(ng)
+                    cff=dt(ng)*pm(i,j)*pn(i,j)
+# ifdef SPLINES_VDIFF
+                    cff=cff*oHz(Isrc,Jsrc,k)
+# endif
+                    IF (LtracerSrc(itrc,ng)) THEN
+                      cff3=SOURCES(ng)%Tsrc(is,k,itrc)
+                    ELSE
+                      cff3=t(Isrc,Jsrc,k,3,itrc)
+                    END IF
+                    t(Isrc,Jsrc,k,nnew,itrc)=t(Isrc,Jsrc,k,nnew,itrc)+  &
+     &                                       cff*SOURCES(ng)%Qsrc(is,k)*&
+     &                                       cff3
+                  END DO
+                END IF
+              END IF
+            END DO
+          END IF
+        END DO
+      END IF
+!
+!-----------------------------------------------------------------------
 !  Time-step vertical diffusion term.
 !-----------------------------------------------------------------------
 !
       J_LOOP2 : DO j=Jstr,Jend                  ! start pipelined J-loop
-#ifdef OFFLINE_BIOLOGY
-        DO ibt=1,NBT
-          itrc=idbio(ibt)
-#else
         DO itrc=1,NT(ng)
-#endif
           ltrc=MIN(NAT,itrc)
 
 # ifdef SPLINES_VDIFF
@@ -1559,51 +1543,12 @@
         END DO
       END DO
 # endif
-# if defined TRC_PSOURCE
 !
-!  Apply tracers point sources to the horizontal advection terms.
-!
-      DO itp=1,NPT
-        itrc=inert(itp)
-        DO is=1,Nsrcpt
-          Isrc=Isrcpt(is)
-          Jsrc=Jsrcpt(is)
-          DO k=1,N(ng)
-            IF ((Hadvection(itrc,ng)%MPDATA).or.                    &
-     &          (Hadvection(itrc,ng)%HSIMT)) THEN
-              LapplySrc=(IstrUm2.le.Isrc).and.                      &
-     &                  (Isrc.le.Iendp2i).and.                      &
-     &                  (JstrVm2.le.Jsrc).and.                      &
-     &                  (Jsrc.le.Jendp2i)
-            ELSE
-              LapplySrc=(Istr.le.Isrc).and.                         &
-     &                  (Isrc.le.Iend+1).and.                       &
-     &                  (Jstr.le.Jsrc).and.                         &
-     &                  (Jsrc.le.Jend)
-            END IF
-            IF (LapplySrc) THEN
-!
-              IF (Lsrcpt(is,itrc)) THEN
-                t(i,j,k,3,itrc)=0.
-                t(i,j,k,nstp,itrc)=Tsrcpt(is,k,itrc)
-                t(i,j,k,nnew,itrc)=Tsrcpt(is,k,itrc)
-              END IF
-            END IF
-          END DO
-        END DO
-      END DO
-# endif
 !-----------------------------------------------------------------------
 !  Apply lateral boundary conditions and, if appropriate, nudge
 !  to tracer data and apply Land/Sea mask.
 !-----------------------------------------------------------------------
 !
-#ifdef OFFLINE_BIOLOGY
-      ! Skip over T and S for nudging OFFLINE
-      ic=2
-      DO ibt=1,NBT
-        itrc=idbio(ibt)
-#else
 !  Initialize tracer counter index. The "tclm" array is only allocated
 !  to the NTCLM fields that need to be processed. This is done to
 !  reduce memory.
@@ -1611,7 +1556,6 @@
       ic=0
 !
       DO itrc=1,NT(ng)
-#endif
 !
 !  Set compact reduced memory tracer index for nudging coefficients and
 !  climatology arrays.
@@ -1652,25 +1596,11 @@
           DO j=JstrR,JendR
             DO i=IstrR,IendR
               t(i,j,k,nnew,itrc)=t(i,j,k,nnew,itrc)*rmask(i,j)
-            END DO
+             END DO
           END DO
         END DO
 # endif
-!# define SALT_LIMIT
-# ifdef SALT_LIMIT
-!
-!  Apply clamp to salt
-!
-      IF (itrc == isalt) THEN
-        DO k=1,N(ng)
-          DO j=JstrR,JendR
-            DO i=IstrR,IendR
-              t(i,j,k,nnew,itrc) = max(t(i,j,k,nnew,itrc),0.0_r8)
-            END DO
-          END DO
-        END DO
-      END IF
-# endif
+
 # ifdef DIAGNOSTICS_TS
 !
 !  Compute time-rate-of-change diagnostic term.
@@ -1686,12 +1616,6 @@
           END DO
         END DO
 # endif
-
-#  if (defined ICE_MODEL && defined ICE_THERMO) || defined CICE_MODEL
-        IF (itrc == isalt) THEN
-          CALL ice_frazil(ng, tile)
-        END IF
-#  endif
 !
 !  Apply periodic boundary conditions.
 !
@@ -1701,6 +1625,127 @@
      &                            t(:,:,:,nnew,itrc))
         END IF
       END DO
+
+! degradation 降解
+#ifdef DEG
+      DO itrc=1,NPT
+        DO k=1,N(ng)
+          DO j=JstrR,JendR
+              DO i=IstrR,IendR
+                IF (rmask(i,j).eq.0_r8) THEN
+                  cycle
+                END IF
+                temp=exp(-0.015*dt(ng)/86400)
+                t(i,j,k,nnew,inert(itrc))=t(i,j,k,nnew,inert(itrc))*temp
+              END DO
+          END DO
+        END DO
+      END DO
+#endif
+
+! simulate dynamic degradation 模拟动态降解
+#ifdef SDDEG
+      DO itrc=1,NPT !dye1不降解
+        maxk=0_r8
+        mink=100000_r8
+        ka=0_r8; kuva=0_r8; kta=0_r8; kcount=0_r8
+        DO k=1,N(ng)
+          DO j=JstrR,JendR
+            DO i=IstrR,IendR
+              IF (rmask(i,j).eq.0_r8) THEN
+                cycle
+              END IF
+              ! 基本降解系数
+              IF (itrc.eq.1) THEN
+                k0=0.007_r8
+              ELSE IF (itrc.eq.2) THEN
+                k0=0.008_r8
+              ELSE IF (itrc.eq.3) THEN
+                k0=0.002_r8
+              END IF
+
+              ! 温度
+              temp=t(i,j,k,nnew,1)
+              kt=1.05_r8**(temp-22_r8)
+              kt=MIN(MAX(kt,0.3_r8),1.5_r8)
+              kta=kta+kt
+
+              kk=k0*kt
+        
+
+              kcount=kcount+1_r8
+              ka=ka+kk
+              mink=MIN(kk,mink)
+              maxk=MAX(kk,maxk)
+              temp=exp(-kk*dt(ng)/86400)
+              t(i,j,k,nnew,inert(itrc))=t(i,j,k,nnew,inert(itrc))*temp
+            END DO
+          END DO
+        END DO
+        IF (kcount .gt. 0_r8 .and. itrc .eq. 1 .and. mod(iic(ng),100) .eq. 0) THEN
+          ! Print "(i4,i4,i6,f12.4,f12.4,f12.4,f12.4,f12.4)", tile,itrc,int(kcount),mink,maxk,ka/kcount,kta/kcount,kuva/kcount
+        END IF
+      END DO
+      IF (tile .eq. 1 .and. mod(iic(ng),300) .eq. 0) THEN
+        Print *, "tile  dye count      min        max       avg      avg_temp     avg_uv"
+      END IF
+#endif
+
+! trace dynamic degradation 溯源动态降解
+#ifdef TDDEG
+      pcount=9
+      DO itrc=1,NPT 
+        maxk=0_r8
+        mink=100000_r8
+        ka=0_r8; kuva=0_r8; kta=0_r8; kcount=0_r8
+        DO k=1,N(ng)
+          DO j=JstrR,JendR
+            DO i=IstrR,IendR
+              IF (rmask(i,j).eq.0_r8) THEN
+                cycle
+              END IF
+              ! Print *, itrc, int(itrc/pcount)
+              ! 基本降解系数
+              IF (int((itrc-1)/pcount) .eq. 0) THEN
+                k0=0.007_r8
+              ELSE IF (int((itrc-1)/pcount) .eq. 1) THEN
+                k0=0.008_r8
+              ELSE IF (int((itrc-1)/pcount) .eq. 2) THEN
+                k0=0.002_r8
+              END IF
+            
+              ! 速度
+              ! temp=(u(i,j,k,2)*u(i,j,k,2)+v(i,j,k,2)*v(i,j,k,2))**0.5
+              ! kuv=temp/(Hz(i,j,k)*5_r8)
+              ! kuv=MAX(MIN(kuv,1_r8),0_r8)
+              ! kuva=kuva+kuv
+
+              ! kk=k0+0.05*kuv
+                
+              ! 温度
+              temp=t(i,j,k,nnew,1)
+              kt=1.05_r8**(temp-22_r8)
+              kt=MIN(MAX(kt,0.3_r8),1.5_r8)
+              kta=kta+kt
+
+              kk=k0*kt
+
+              kcount=kcount+1_r8
+              ka=ka+kk
+              mink=MIN(kk,mink)
+              maxk=MAX(kk,maxk)
+              temp=exp(-kk*dt(ng)/86400)
+              t(i,j,k,nnew,inert(itrc))=t(i,j,k,nnew,inert(itrc))*temp
+            END DO
+          END DO
+        END DO
+        IF (kcount .gt. 0_r8 .and. itrc .eq. 1) THEN
+          ! Print "(i4,i4,f12.4,f12.4,f12.4,f12.4,f12.4)", tile,itrc,mink,maxk,ka/kcount,kta/kcount,kuva/kcount
+        END IF
+      END DO
+#endif
+      
+      
 # ifdef DISTRIBUTE
 !
 !  Exchange boundary data.

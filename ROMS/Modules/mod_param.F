@@ -1219,7 +1219,7 @@
 #ifdef SOLVE3D
 !
 !-----------------------------------------------------------------------
-!  Allocate rracer horizontal and vertical advection switches structure.
+!  Allocate tracer horizontal and vertical advection switches structure.
 !-----------------------------------------------------------------------
 !
 !  Nonlinear model kernel.
@@ -1232,7 +1232,7 @@
             Hadvection(itrc,ng)%CENTERED2 = .FALSE.
             Hadvection(itrc,ng)%CENTERED4 = .FALSE.
             Hadvection(itrc,ng)%HSIMT = .FALSE.
-            Hadvection(itrc,ng)%MPDATA = .FALSE.
+            Hadvection(itrc,ng)%MPDATA = .true.
             Hadvection(itrc,ng)%SPLINES = .FALSE.
             Hadvection(itrc,ng)%SPLIT_U3 = .FALSE.
             Hadvection(itrc,ng)%UPSTREAM3 = .FALSE.
@@ -1248,7 +1248,7 @@
             Vadvection(itrc,ng)%CENTERED2 = .FALSE.
             Vadvection(itrc,ng)%CENTERED4 = .FALSE.
             Vadvection(itrc,ng)%HSIMT = .FALSE.
-            Vadvection(itrc,ng)%MPDATA = .FALSE.
+            Vadvection(itrc,ng)%MPDATA = .true.
             Vadvection(itrc,ng)%SPLINES = .FALSE.
             Vadvection(itrc,ng)%SPLIT_U3 = .FALSE.
             Vadvection(itrc,ng)%UPSTREAM3 = .FALSE.
